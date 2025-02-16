@@ -131,7 +131,7 @@ function determineSecFetchSite(prevUrl: URL, currentUrl: URL): string {
   return "cross-site";
 }
 
-function sanitizeHeaders(headers: Record<string, any>): Record<string, string> {
+function sanitizeHeaders(headers: Record<string, unknown>): Record<string, string> {
   return Object.fromEntries(
     Object.entries(headers)
       .filter(([key]) => !EXCLUDED_HEADERS.has(key.toLowerCase()))
@@ -141,7 +141,7 @@ function sanitizeHeaders(headers: Record<string, any>): Record<string, string> {
 
 function processRedirectHeaders(
   currentHeaders: Record<string, string>,
-  newHeaders: Record<string, any>,
+  newHeaders: Record<string, unknown>,
   currentUrl: string,
   nextUrl: string
 ): Record<string, string> {
@@ -227,7 +227,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const MAX_REDIRECTS = 20;
     let redirectCount = 0;
-    let previousUrls = new Set([currentUrl]);
+    const previousUrls = new Set([currentUrl]);
 
     while (redirectCount < MAX_REDIRECTS) {
       try {
