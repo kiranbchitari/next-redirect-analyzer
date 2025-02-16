@@ -79,7 +79,6 @@ const BROWSER_PROFILES: Record<string, BrowserProfile> = {
   },
 };
 
-
 // Headers that should not be forwarded
 const EXCLUDED_HEADERS = new Set([
   "content-length",
@@ -165,13 +164,18 @@ function sanitizeHeaders(headers: Record<string, unknown>): Record<string, strin
   );
 }
 
+type ChromeHeaders = BrowserProfile["headers"] & {
+  Referer?: string;
+  [key: string]: string | undefined; // Allow dynamic indexing
+};
+
 function processRedirectHeaders(
-  currentHeaders: Record<string, string>,
+  currentHeaders: ChromeHeaders,
   newHeaders: Record<string, unknown>,
   currentUrl: string,
   nextUrl: string
-): Record<string, string> {
-  const processedHeaders = { ...currentHeaders };
+): ChromeHeaders {
+  const processedHeaders: ChromeHeaders = { ...currentHeaders };
   
   // Parse URLs
   const currentUrlObj = new URL(currentUrl);
@@ -196,7 +200,7 @@ function processRedirectHeaders(
   );
 
   if (referrerToSend) {
-    processedHeaders["Referer"] = referrerToSend;
+    processedHeaders["Referer"] = referrerToSend; // Now this is allowed
   } else {
     delete processedHeaders["Referer"];
   }
@@ -233,7 +237,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Initialize headers with Chrome profile and custom referer
-    let currentHeaders = {
+    let currentHeaders: ChromeHeaders = {
       ...BROWSER_PROFILES.chrome.headers,
       ...(referer && { 
         Referer: referer,
