@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, ArrowDown } from "lucide-react";
+import { ExternalLink, ArrowDown, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -43,33 +43,66 @@ export default function Home() {
   };
 
   return (
-    <div className="container mx-auto py-10 px-6 max-w-3xl space-y-6">
-      <Card>
+    <div className="container mx-auto py-12 px-6 max-w-3xl space-y-6">
+      {/* Main Card */}
+      <Card className="shadow-xl border border-gray-200 rounded-lg">
         <CardHeader>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent text-center">
             URL Redirect Analyzer
           </CardTitle>
-          <CardDescription>
-            Analyze URL redirects and track the full redirect chain with referer spoofing.
+          <CardDescription className="text-center text-gray-600">
+            Track and analyze URL redirects with custom referers.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input placeholder="Enter URL" value={url} onChange={(e) => setUrl(e.target.value)} required />
-            <Input placeholder="Enter Referer (optional)" value={referer} onChange={(e) => setReferer(e.target.value)} />
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Analyzing..." : "Analyze Redirects"}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Target URL</label>
+              <Input 
+                placeholder="https://example.com" 
+                value={url} 
+                onChange={(e) => setUrl(e.target.value)} 
+                required 
+                className="rounded-lg border-gray-300 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Referer (Optional)</label>
+              <Input 
+                placeholder="https://referrer.com" 
+                value={referer} 
+                onChange={(e) => setReferer(e.target.value)} 
+                className="rounded-lg border-gray-300 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-primary to-purple-600 text-white font-semibold rounded-lg py-2 hover:opacity-90 transition"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                "Analyze Redirects"
+              )}
             </Button>
           </form>
-          {error && <p className="text-red-500 mt-4">{error}</p>}
+
+          {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </CardContent>
       </Card>
 
+      {/* Result Section */}
       {result && (
-        <Card>
+        <Card className="shadow-xl border border-gray-200 rounded-lg">
           <CardHeader>
-            <CardTitle>Analysis Results</CardTitle>
-            <CardDescription>Complete redirect chain and final destination.</CardDescription>
+            <CardTitle className="text-xl font-semibold">Analysis Results</CardTitle>
+            <CardDescription className="text-gray-600">Full redirect chain and final destination.</CardDescription>
           </CardHeader>
           <CardContent>
             <RedirectChain response={result} />
@@ -86,19 +119,19 @@ interface RedirectChainProps {
 
 function RedirectChain({ response }: RedirectChainProps) {
   return (
-    <ScrollArea className="h-[500px] border rounded p-4">
+    <ScrollArea className="h-[450px] border rounded-lg p-4 bg-gray-50">
       <div className="space-y-6">
         {response.redirectChain.map((redirect, index) => (
-          <div key={index} className="space-y-2">
-            <div className="flex items-start gap-4">
-              <span className="px-2 py-1 bg-gray-200 text-sm rounded font-mono">{redirect.statusCode}</span>
+          <div key={index} className="space-y-3 bg-white p-4 rounded-lg shadow-sm border">
+            <div className="flex items-center gap-4">
+              <span className="px-3 py-1 bg-gray-300 text-sm rounded-lg font-mono text-gray-800">{redirect.statusCode}</span>
               <a href={redirect.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
                 {redirect.url} <ExternalLink className="h-4 w-4" />
               </a>
             </div>
             <details className="text-sm">
-              <summary className="cursor-pointer hover:text-blue-600">Response Headers</summary>
-              <div className="mt-2 p-3 bg-gray-100 rounded font-mono text-xs">
+              <summary className="cursor-pointer text-gray-700 hover:text-blue-600">Response Headers</summary>
+              <div className="mt-2 p-3 bg-gray-100 rounded-lg font-mono text-xs">
                 {Object.entries(redirect.headers).map(([key, value]) => (
                   <div key={key}>
                     <span className="text-blue-600">{key}</span>: {value}
@@ -110,16 +143,16 @@ function RedirectChain({ response }: RedirectChainProps) {
           </div>
         ))}
         <Separator />
-        <div className="font-semibold">Final Destination</div>
+        <div className="font-semibold text-lg text-gray-700">Final Destination</div>
         <div className="flex items-center gap-2">
-          <span className="px-2 py-1 bg-gray-200 text-sm rounded font-mono">{response.finalStatusCode}</span>
+          <span className="px-3 py-1 bg-green-400 text-white text-sm rounded-lg font-mono">{response.finalStatusCode}</span>
           <a href={response.finalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
             {response.finalUrl} <ExternalLink className="h-4 w-4" />
           </a>
         </div>
         <details className="text-sm">
-          <summary className="cursor-pointer hover:text-blue-600">Final Response Headers</summary>
-          <div className="mt-2 p-3 bg-gray-100 rounded font-mono text-xs">
+          <summary className="cursor-pointer text-gray-700 hover:text-blue-600">Final Response Headers</summary>
+          <div className="mt-2 p-3 bg-gray-100 rounded-lg font-mono text-xs">
             {Object.entries(response.finalHeaders).map(([key, value]) => (
               <div key={key}>
                 <span className="text-blue-600">{key}</span>: {value}
