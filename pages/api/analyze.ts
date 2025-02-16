@@ -42,7 +42,6 @@ const BROWSER_PROFILES = {
       "Priority": "u=0, i",
       "Upgrade-Insecure-Requests": "1",
     },
-    // Common Chrome window.navigator properties
     jsFingerprint: {
       platform: "Win32",
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -66,6 +65,126 @@ const EXCLUDED_HEADERS = new Set([
   "cookie",
   "set-cookie",
 ]);
+
+type ReferrerPolicy = 
+  | "no-referrer"
+  | "no-referrer-when-downgrade"
+  | "same-origin"
+  | "origin"
+  | "strict-origin"
+  | "origin-when-cross-origin"
+  | "strict-origin-when-cross-origin"
+  | "unsafe-url";
+
+function shouldSendReferrer(
+  currentUrl: URL,
+  targetUrl: URL,
+  referrerPolicy: ReferrerPolicy,
+  referrer: string
+): string | null {
+  if (referrerPolicy === "no-referrer") {
+    return null;
+  }
+
+  const referrerUrl = new URL(referrer);
+  const isSameOrigin = currentUrl.origin === targetUrl.origin;
+  const isDowngrade = 
+    currentUrl.protocol === "https:" && targetUrl.protocol === "http:";
+
+  switch (referrerPolicy) {
+    case "no-referrer-when-downgrade":
+      return isDowngrade ? null : referrer;
+
+    case "same-origin":
+      return isSameOrigin ? referrer : null;
+
+    case "origin":
+      return referrerUrl.origin;
+
+    case "strict-origin":
+      return isDowngrade ? null : referrerUrl.origin;
+
+    case "origin-when-cross-origin":
+      return isSameOrigin ? referrer : referrerUrl.origin;
+
+    case "strict-origin-when-cross-origin":
+      if (isSameOrigin) return referrer;
+      return isDowngrade ? null : referrerUrl.origin;
+
+    case "unsafe-url":
+      return referrer;
+
+    default:
+      // Default to strict-origin-when-cross-origin per spec
+      if (isSameOrigin) return referrer;
+      return isDowngrade ? null : referrerUrl.origin;
+  }
+}
+
+function determineSecFetchSite(prevUrl: URL, currentUrl: URL): string {
+  if (prevUrl.hostname === currentUrl.hostname) {
+    return "same-origin";
+  }
+  if (prevUrl.hostname.endsWith(currentUrl.hostname) || currentUrl.hostname.endsWith(prevUrl.hostname)) {
+    return "same-site";
+  }
+  return "cross-site";
+}
+
+function sanitizeHeaders(headers: Record<string, any>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers)
+      .filter(([key]) => !EXCLUDED_HEADERS.has(key.toLowerCase()))
+      .map(([key, value]) => [key, Array.isArray(value) ? value.join(", ") : String(value)])
+  );
+}
+
+function processRedirectHeaders(
+  currentHeaders: Record<string, string>,
+  newHeaders: Record<string, any>,
+  currentUrl: string,
+  nextUrl: string
+): Record<string, string> {
+  const processedHeaders = { ...currentHeaders };
+  
+  // Parse URLs
+  const currentUrlObj = new URL(currentUrl);
+  const nextUrlObj = new URL(nextUrl);
+  
+  // Get referrer policy from response headers (case-insensitive)
+  const referrerPolicy = (
+    newHeaders["referrer-policy"] || 
+    newHeaders["Referrer-Policy"] || 
+    "strict-origin-when-cross-origin"
+  ).toLowerCase() as ReferrerPolicy;
+
+  // Determine if and how to send referrer
+  const referrerToSend = shouldSendReferrer(
+    currentUrlObj,
+    nextUrlObj,
+    referrerPolicy,
+    currentUrl
+  );
+
+  if (referrerToSend) {
+    processedHeaders["Referer"] = referrerToSend;
+  } else {
+    delete processedHeaders["Referer"];
+  }
+  
+  // Update Sec-Fetch-Site based on URL relationship
+  processedHeaders["Sec-Fetch-Site"] = determineSecFetchSite(currentUrlObj, nextUrlObj);
+  
+  // Copy other safe headers
+  for (const [key, value] of Object.entries(newHeaders)) {
+    const lowerKey = key.toLowerCase();
+    if (!EXCLUDED_HEADERS.has(lowerKey)) {
+      processedHeaders[key] = Array.isArray(value) ? value.join(", ") : String(value);
+    }
+  }
+
+  return processedHeaders;
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -99,7 +218,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       timeout: 30000,
       decompress: true,
       httpsAgent,
-      // Add common browser behavior
       transitional: {
         clarifyTimeoutError: true,
         forcedJSONParsing: true,
@@ -213,50 +331,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     res.status(500).json({ message: error instanceof Error ? error.message : "An unexpected error occurred" });
   }
-}
-
-function sanitizeHeaders(headers: Record<string, any>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(headers)
-      .filter(([key]) => !EXCLUDED_HEADERS.has(key.toLowerCase()))
-      .map(([key, value]) => [key, Array.isArray(value) ? value.join(", ") : String(value)])
-  );
-}
-
-function determineSecFetchSite(prevUrl: URL, currentUrl: URL): string {
-  if (prevUrl.hostname === currentUrl.hostname) {
-    return "same-origin";
-  }
-  if (prevUrl.hostname.endsWith(currentUrl.hostname) || currentUrl.hostname.endsWith(prevUrl.hostname)) {
-    return "same-site";
-  }
-  return "cross-site";
-}
-
-function processRedirectHeaders(
-  currentHeaders: Record<string, string>,
-  newHeaders: Record<string, any>,
-  currentUrl: string,
-  nextUrl: string
-): Record<string, string> {
-  // Start with current headers
-  const processedHeaders = { ...currentHeaders };
-  
-  // Update referer to maintain chain
-  processedHeaders["Referer"] = currentUrl;
-  
-  // Update Sec-Fetch-Site based on URL relationship
-  const currentUrlObj = new URL(currentUrl);
-  const nextUrlObj = new URL(nextUrl);
-  processedHeaders["Sec-Fetch-Site"] = determineSecFetchSite(currentUrlObj, nextUrlObj);
-  
-  // Preserve relevant headers from the redirect response
-  for (const [key, value] of Object.entries(newHeaders)) {
-    const lowerKey = key.toLowerCase();
-    if (!EXCLUDED_HEADERS.has(lowerKey)) {
-      processedHeaders[key] = Array.isArray(value) ? value.join(", ") : String(value);
-    }
-  }
-
-  return processedHeaders;
 }
