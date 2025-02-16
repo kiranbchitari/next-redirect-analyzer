@@ -43,15 +43,14 @@ export default function Home() {
   };
 
   return (
-    <div className="container mx-auto py-12 px-6 max-w-3xl space-y-6">
-      {/* Main Card */}
+    <div className="container mx-auto py-12 px-4 sm:px-6 max-w-3xl space-y-6">
       <Card className="shadow-xl border border-gray-200 rounded-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent text-center">
-            URL Redirect Analyzer
+            URL Referer Spoofer
           </CardTitle>
           <CardDescription className="text-center text-gray-600">
-            Track and analyze URL redirects with custom referers.
+          Analyze URL redirections and simulate requests with custom referers for testing and debugging.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -63,25 +62,17 @@ export default function Home() {
                 value={url} 
                 onChange={(e) => setUrl(e.target.value)} 
                 required 
-                className="rounded-lg border-gray-300 focus:ring-primary focus:border-primary"
               />
             </div>
-
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Referer (Optional)</label>
               <Input 
                 placeholder="https://referrer.com" 
                 value={referer} 
                 onChange={(e) => setReferer(e.target.value)} 
-                className="rounded-lg border-gray-300 focus:ring-primary focus:border-primary"
               />
             </div>
-
-            <Button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-primary to-purple-600 text-white font-semibold rounded-lg py-2 hover:opacity-90 transition"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full bg-gradient-to-r from-primary to-purple-600 text-white font-semibold rounded-lg py-2 hover:opacity-90 transition" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -92,12 +83,9 @@ export default function Home() {
               )}
             </Button>
           </form>
-
           {error && <p className="text-red-500 text-sm mt-4">{error}</p>}
         </CardContent>
       </Card>
-
-      {/* Result Section */}
       {result && (
         <Card className="shadow-xl border border-gray-200 rounded-lg">
           <CardHeader>
@@ -113,19 +101,24 @@ export default function Home() {
   );
 }
 
-interface RedirectChainProps {
-  response: RedirectResponse;
-}
+const getStatusColor = (status: number) => {
+  if (status >= 200 && status < 300) return "bg-green-400 text-white";
+  if (status >= 300 && status < 400) return "bg-blue-400 text-white";
+  if (status >= 400 && status < 500) return "bg-yellow-400 text-black";
+  return "bg-red-500 text-white";
+};
 
-function RedirectChain({ response }: RedirectChainProps) {
+function RedirectChain({ response }: { response: RedirectResponse }) {
   return (
     <ScrollArea className="h-[450px] border rounded-lg p-4 bg-gray-50">
       <div className="space-y-6">
         {response.redirectChain.map((redirect, index) => (
           <div key={index} className="space-y-3 bg-white p-4 rounded-lg shadow-sm border">
-            <div className="flex items-center gap-4">
-              <span className="px-3 py-1 bg-gray-300 text-sm rounded-lg font-mono text-gray-800">{redirect.statusCode}</span>
-              <a href={redirect.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className={`px-3 py-1 rounded-lg font-mono ${getStatusColor(redirect.statusCode)}`}>
+                {redirect.statusCode}
+              </span>
+              <a href={redirect.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 break-all">
                 {redirect.url} <ExternalLink className="h-4 w-4" />
               </a>
             </div>
@@ -144,22 +137,14 @@ function RedirectChain({ response }: RedirectChainProps) {
         ))}
         <Separator />
         <div className="font-semibold text-lg text-gray-700">Final Destination</div>
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 bg-green-400 text-white text-sm rounded-lg font-mono">{response.finalStatusCode}</span>
-          <a href={response.finalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`px-3 py-1 rounded-lg font-mono ${getStatusColor(response.finalStatusCode)}`}>
+            {response.finalStatusCode}
+          </span>
+          <a href={response.finalUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 break-all">
             {response.finalUrl} <ExternalLink className="h-4 w-4" />
           </a>
         </div>
-        <details className="text-sm">
-          <summary className="cursor-pointer text-gray-700 hover:text-blue-600">Final Response Headers</summary>
-          <div className="mt-2 p-3 bg-gray-100 rounded-lg font-mono text-xs">
-            {Object.entries(response.finalHeaders).map(([key, value]) => (
-              <div key={key}>
-                <span className="text-blue-600">{key}</span>: {value}
-              </div>
-            ))}
-          </div>
-        </details>
       </div>
     </ScrollArea>
   );
