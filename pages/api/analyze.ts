@@ -153,10 +153,13 @@ function processRedirectHeaders(
   
   // Get referrer policy from response headers (case-insensitive)
   const referrerPolicy = (
-    newHeaders["referrer-policy"] || 
-    newHeaders["Referrer-Policy"] || 
-    "strict-origin-when-cross-origin"
+    typeof newHeaders["referrer-policy"] === "string"
+      ? newHeaders["referrer-policy"]
+      : typeof newHeaders["Referrer-Policy"] === "string"
+      ? newHeaders["Referrer-Policy"]
+      : "strict-origin-when-cross-origin"
   ).toLowerCase() as ReferrerPolicy;
+  
 
   // Determine if and how to send referrer
   const referrerToSend = shouldSendReferrer(
