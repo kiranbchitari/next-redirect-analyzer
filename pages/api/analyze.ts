@@ -2,29 +2,54 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import axios from "axios";
 import { redirectRequestSchema, type RedirectResponse } from "@/shared/schema";
 import { z } from "zod";
-import https from "https";
+import * as https from "https";
+import * as tls from "tls";
 
 // Chrome 121 TLS ciphers and settings
-const tlsConfig = {
-  minVersion: 'TLSv1.2',
-  maxVersion: 'TLSv1.3',
-  cipherSuites: [
-    'TLS_AES_128_GCM_SHA256',
-    'TLS_AES_256_GCM_SHA384',
-    'TLS_CHACHA20_POLY1305_SHA256',
-    'ECDHE-ECDSA-AES128-GCM-SHA256',
-    'ECDHE-RSA-AES128-GCM-SHA256',
-    'ECDHE-ECDSA-AES256-GCM-SHA384',
-    'ECDHE-RSA-AES256-GCM-SHA384'
-  ]
+const tlsConfig: https.AgentOptions = {
+  minVersion: "TLSv1.2" as tls.SecureVersion, // Explicit cast
+  maxVersion: "TLSv1.3" as tls.SecureVersion, // Explicit cast
+  ciphers: "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384", // Ensure it's a string
+  keepAlive: true,
 };
 
-// Chrome 121 headers and fingerprint
-const BROWSER_PROFILES = {
+interface BrowserProfile {
+  headers: {
+    "User-Agent": string;
+    Accept: string;
+    "Accept-Language": string;
+    "Accept-Encoding": string;
+    "Sec-Ch-Ua": string;
+    "Sec-Ch-Ua-Mobile": string;
+    "Sec-Ch-Ua-Platform": string;
+    "Sec-Ch-Ua-Platform-Version": string;
+    "Sec-Ch-Ua-Arch": string;
+    "Sec-Ch-Ua-Bitness": string;
+    "Sec-Ch-Ua-Full-Version": string;
+    "Sec-Ch-Ua-Full-Version-List": string;
+    "Sec-Fetch-Dest": string;
+    "Sec-Fetch-Mode": string;
+    "Sec-Fetch-Site": string;
+    "Sec-Fetch-User": string;
+    Priority: string;
+    "Upgrade-Insecure-Requests": string;
+  };
+  jsFingerprint: {
+    platform: string;
+    userAgent: string;
+    language: string;
+    languages: string[];
+    hardwareConcurrency: number;
+    deviceMemory: number;
+    maxTouchPoints: number;
+  };
+}
+
+const BROWSER_PROFILES: Record<string, BrowserProfile> = {
   chrome: {
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
       "Accept-Language": "en-US,en;q=0.9",
       "Accept-Encoding": "gzip, deflate, br",
       "Sec-Ch-Ua": '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
@@ -39,7 +64,7 @@ const BROWSER_PROFILES = {
       "Sec-Fetch-Mode": "navigate",
       "Sec-Fetch-Site": "none",
       "Sec-Fetch-User": "?1",
-      "Priority": "u=0, i",
+      Priority: "u=0, i",
       "Upgrade-Insecure-Requests": "1",
     },
     jsFingerprint: {
@@ -50,9 +75,10 @@ const BROWSER_PROFILES = {
       hardwareConcurrency: 8,
       deviceMemory: 8,
       maxTouchPoints: 0,
-    }
-  }
+    },
+  },
 };
+
 
 // Headers that should not be forwarded
 const EXCLUDED_HEADERS = new Set([
